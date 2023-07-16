@@ -4,10 +4,8 @@ import "time"
 
 func ResetGoroutine() {
 	for {
-		SetNextResetTime(time.Now().Add(ResetInterval))
+		time.Sleep(time.Minute)
 
-		time.Sleep(ResetInterval)
-
-		DeleteAllIPCounts()
+		PruneOldRequests()
 	}
 }

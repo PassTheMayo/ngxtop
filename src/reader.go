@@ -11,7 +11,7 @@ import (
 var ipAddressRegEx = regexp.MustCompile(`\d{1,3}(\.\d{1,3}){3}`)
 
 func ReaderGoroutine() {
-	f, err := os.Open("/var/log/nginx/access.log")
+	f, err := os.Open(LogPath)
 
 	if err != nil {
 		panic(err)
@@ -42,6 +42,6 @@ func ReaderGoroutine() {
 			continue
 		}
 
-		IncrementIPCount(matches[0][0])
+		AddRequest(matches[0][0])
 	}
 }

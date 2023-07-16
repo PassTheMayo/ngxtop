@@ -7,60 +7,94 @@ import (
 )
 
 var (
-	ipCounts       map[string]int = make(map[string]int)
-	ipCountsMutex  *sync.Mutex    = &sync.Mutex{}
-	nextReset      time.Time      = time.Now()
-	nextResetMutex *sync.Mutex    = &sync.Mutex{}
+	requests      []Request   = make([]Request, 0)
+	requestsMutex *sync.Mutex = &sync.Mutex{}
 )
 
-type IPCount struct {
+type Request struct {
+	IPAddress string
+	Timestamp time.Time
+}
+
+type UniqueRemoteCount struct {
 	IPAddress string
 	Count     int
 }
 
-func SetNextResetTime(t time.Time) {
-	nextResetMutex.Lock()
+func AddRequest(addr string) {
+	requestsMutex.Lock()
 
-	defer nextResetMutex.Unlock()
+	defer requestsMutex.Unlock()
 
-	nextReset = t
+	requests = append(requests, Request{
+		IPAddress: addr,
+		Timestamp: time.Now(),
+	})
 }
 
-func DeleteAllIPCounts() {
-	ipCountsMutex.Lock()
-	ipCounts = make(map[string]int)
-	ipCountsMutex.Unlock()
-}
+func PruneOldRequests() {
+	requestsMutex.Lock()
 
-func IncrementIPCount(addr string) {
-	ipCountsMutex.Lock()
+	defer requestsMutex.Unlock()
 
-	defer ipCountsMutex.Unlock()
+	for i := 0; i < len(requests); i++ {
+		if time.Since(requests[i].Timestamp) < ResetInterval {
+			continue
+		}
 
-	if v, ok := ipCounts[addr]; ok {
-		ipCounts[addr] = v + 1
-	} else {
-		ipCounts[addr] = 1
+		requests = requests[i:]
 	}
 }
 
-func GetSortedIPCounts() []IPCount {
-	ipCountsMutex.Lock()
+func GetSortedIPCounts() []UniqueRemoteCount {
+	requestsMutex.Lock()
 
-	ipCountList := make([]IPCount, 0)
+	defer requestsMutex.Unlock()
 
-	for ipAddress, count := range ipCounts {
-		ipCountList = append(ipCountList, IPCount{
-			IPAddress: ipAddress,
+	ipCountMap := make(map[string]int)
+
+	for _, req := range requests {
+		if time.Since(req.Timestamp) > ResetInterval {
+			continue
+		}
+
+		if v, ok := ipCountMap[req.IPAddress]; ok {
+			ipCountMap[req.IPAddress] = v + 1
+		} else {
+			ipCountMap[req.IPAddress] = 1
+		}
+	}
+
+	requestList := make([]UniqueRemoteCount, 0)
+
+	for addr, count := range ipCountMap {
+		requestList = append(requestList, UniqueRemoteCount{
+			IPAddress: addr,
 			Count:     count,
 		})
 	}
 
-	ipCountsMutex.Unlock()
-
-	sort.SliceStable(ipCountList, func(i, j int) bool {
-		return ipCountList[i].Count > ipCountList[j].Count
+	sort.SliceStable(requestList, func(i, j int) bool {
+		return requestList[i].Count > requestList[j].Count
 	})
 
-	return ipCountList
+	return requestList
+}
+
+func GetTotalRequestCount() int {
+	requestsMutex.Lock()
+
+	defer requestsMutex.Unlock()
+
+	count := 0
+
+	for _, req := range requests {
+		if time.Since(req.Timestamp) > ResetInterval {
+			continue
+		}
+
+		count++
+	}
+
+	return count
 }
