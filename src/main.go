@@ -16,7 +16,8 @@ var (
 )
 
 func main() {
-	fmt.Print("\u001b[?47h")
+	fmt.Print("\u001b[?47h") // Save the screen
+	fmt.Print("\u001b[?25l") // Make the cursor invisible
 
 	go ResetGoroutine()
 	go ReaderGoroutine()
@@ -26,5 +27,6 @@ func main() {
 	signal.Notify(s, os.Interrupt)
 	<-s
 
-	fmt.Print("\u001b[?47l\u001b[?25h")
+	fmt.Print("\u001b[?47l") // Restore the screen
+	fmt.Print("\u001b[?25h") // Make the cursor visible
 }
